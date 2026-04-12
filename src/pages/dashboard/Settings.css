@@ -1,0 +1,117 @@
+.settings-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-section {
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 500px;
+}
+
+.integrations-panel {
+  border-left: 4px solid #e1306c;
+}
+
+.integration-header {
+  margin-bottom: 2rem;
+}
+
+.integration-desc {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.integration-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.integration-card {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  transition: all 0.2s ease;
+}
+
+.integration-card:hover {
+  border-color: rgba(225, 48, 108, 0.4);
+}
+
+.card-info h4 {
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.card-info p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.integration-status {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.integration-status.connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.disconnect-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.disconnect-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* BIG INSTAGRAM BUTTON */
+.connect-ig-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(220, 39, 67, 0.4);
+}
+
+.connect-ig-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(220, 39, 67, 0.6);
+  filter: brightness(1.1);
+}
