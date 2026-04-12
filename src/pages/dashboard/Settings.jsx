@@ -51,7 +51,7 @@ export default function Settings() {
                 <h4>Adicionar Conta</h4>
                 <p>Conecte uma nova conta para gerenciar seu conteúdo.</p>
               </div>
-              <button className="connect-ig-btn">
+              <button className="connect-ig-btn" onClick={() => window.location.href = 'https://iceolab-backend.onrender.com/api/auth/meta'}>
                 <Smartphone size={20} />
                 Conectar Instagram Profissional
               </button>
