@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   FlaskConical, FolderOpen, Upload, Send, CheckCircle,
   AlertCircle, Loader, Trash2, Film, X
@@ -15,7 +15,31 @@ function formatSize(bytes) {
 
 export default function ReelsLab() {
   const [videos, setVideos] = useState([]);
+  const [waking, setWaking] = useState(false);
   const folderInputRef = useRef();
+
+  // ── Carrega vídeos já no Supabase ao montar (persistência entre abas) ──
+  useEffect(() => {
+    fetch(`${BACKEND_URL}/api/videos`)
+      .then(r => r.json())
+      .then(({ videos: cloud }) => {
+        if (!cloud?.length) return;
+        setVideos(cloud.map(f => ({
+          id: `cloud-${f.name}`,
+          file: null,
+          name: f.name,
+          size: f.size,
+          previewUrl: null,   // sem arquivo local — usar publicUrl no <video>
+          status: 'ready',
+          uploadProgress: 100,
+          publicUrl: f.url,
+          postId: null,
+          caption: '',
+          errorMsg: null,
+        })));
+      })
+      .catch(() => {}); // silencia se backend ainda dormindo
+  }, []);
 
   // ── Helpers de estado ────────────────────────────────────────────────
   const updateVideo = useCallback((id, patch) => {
@@ -45,9 +69,35 @@ export default function ReelsLab() {
       errorMsg: null,
     }));
 
-    setVideos(prev => [...prev, ...newVideos]);
+  // ── Seleção de pasta ────────────────────────────────────────
+  const handleFolderSelect = (e) => {
+    const files = Array.from(e.target.files).filter(f =>
+      f.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(f.name)
+    );
+    if (!files.length) return;
+
+    setVideos(prev => {
+      const existingNames = new Set(prev.map(v => v.name));
+      const newCards = files
+        .filter(f => !existingNames.has(f.name)) // não duplica já existentes
+        .map(file => ({
+          id: `${Date.now()}-${Math.random()}`,
+          file,
+          name: file.name,
+          size: file.size,
+          previewUrl: URL.createObjectURL(file),
+          status: 'idle',
+          uploadProgress: 0,
+          publicUrl: null,
+          postId: null,
+          caption: '',
+          errorMsg: null,
+        }));
+      return [...prev, ...newCards];
+    });
     e.target.value = '';
   };
+
 
   // ── Upload individual → Supabase Storage ─────────────────────────────
   const handleUpload = async (video) => {
@@ -61,6 +111,7 @@ export default function ReelsLab() {
       const publicUrl = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${BACKEND_URL}/api/videos/upload`);
+        xhr.timeout = 300000; // 5 min para vídeos grandes
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
@@ -80,7 +131,8 @@ export default function ReelsLab() {
             } catch { reject(new Error('Erro desconhecido')); }
           }
         };
-        xhr.onerror = () => reject(new Error('Sem conexão com o backend.'));
+        xhr.ontimeout = () => reject(new Error('Timeout — tente um vídeo menor ou aguarde o servidor acordar.'));
+        xhr.onerror   = () => reject(new Error('Sem conexão. Aguarde ~30s e tente novamente (servidor pode estar acordando).'));
         xhr.send(formData);
       });
 
@@ -90,9 +142,19 @@ export default function ReelsLab() {
     }
   };
 
-  // ── Upload de todos pendentes ─────────────────────────────────────────
-  const handleUploadAll = () => {
-    videos.filter(v => v.status === 'idle').forEach(v => handleUpload(v));
+  // ── Upload sequencial de todos pendentes (1 por vez = sem crash de RAM) ──
+  const [waking, setWaking] = useState(false);
+  const handleUploadAll = async () => {
+    const pending = videos.filter(v => v.status === 'idle');
+    if (!pending.length) return;
+    // Acorda o Render antes de começar
+    setWaking(true);
+    try { await fetch(`${BACKEND_URL}/api/accounts`); } catch (_) {}
+    setWaking(false);
+    // Um por vez para não estourar a memória do servidor
+    for (const v of pending) {
+      await handleUpload(v);
+    }
   };
 
   // ── Postagem no Instagram ────────────────────────────────────────────
@@ -184,10 +246,12 @@ export default function ReelsLab() {
                 <FolderOpen size={16} />
                 Adicionar Pasta
               </button>
-              {idleCount > 0 && (
-                <button className="toolbar-btn primary" onClick={handleUploadAll}>
-                  <Upload size={16} />
-                  Fazer Upload de Todos ({idleCount})
+              {(idleCount > 0 || waking) && (
+                <button className="toolbar-btn primary" onClick={handleUploadAll} disabled={waking}>
+                  {waking
+                    ? <><Loader size={16} style={{ animation: 'spin 1s linear infinite' }} /> Acordando servidor...</>
+                    : <><Upload size={16} /> Fazer Upload de Todos ({idleCount})</>
+                  }
                 </button>
               )}
 
@@ -225,7 +289,9 @@ export default function ReelsLab() {
 
 // ── Componente individual de cada vídeo ──────────────────────────────────
 function VideoCard({ video, onUpload, onPost, onRemove, onCaptionChange }) {
-  const { name, size, previewUrl, status, uploadProgress, caption, postId, errorMsg } = video;
+  const { name, size, previewUrl, publicUrl, status, uploadProgress, caption, postId, errorMsg } = video;
+  const videoSrc = previewUrl || publicUrl; // local blob ou URL do Supabase
+
 
   const statusConfig = {
     idle:      { label: 'Aguardando upload', color: '#94a3b8' },
@@ -244,7 +310,7 @@ function VideoCard({ video, onUpload, onPost, onRemove, onCaptionChange }) {
       {/* Preview */}
       <div className="video-preview-wrap">
         <video
-          src={previewUrl}
+          src={videoSrc}
           className="video-thumb"
           muted
           playsInline
