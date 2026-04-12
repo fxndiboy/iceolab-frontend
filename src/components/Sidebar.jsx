@@ -1,5 +1,5 @@
 import { NavLink, Link } from 'react-router-dom';
-import { LayoutDashboard, Wand2, Clock, Settings, LogOut, Hexagon } from 'lucide-react';
+import { LayoutDashboard, FlaskConical, Clock, Settings, LogOut, Hexagon } from 'lucide-react';
 import './Sidebar.css';
 
 export default function Sidebar() {
@@ -20,8 +20,8 @@ export default function Sidebar() {
           </li>
           <li className="nav-item">
             <NavLink to="/dashboard/clips">
-              <Wand2 size={20} />
-              <span>Gerar Clipes</span>
+              <FlaskConical size={20} />
+              <span>Lab de Reels</span>
             </NavLink>
           </li>
           <li className="nav-item">
