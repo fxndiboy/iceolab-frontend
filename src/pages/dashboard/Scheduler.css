@@ -109,6 +109,40 @@
 .vs-name { font-size: 0.82rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vs-size { font-size: 0.72rem; color: var(--text-secondary); }
 
+.vs-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.badge-new {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.15); /* Roxo neon sutil */
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-acc {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05); /* Cinza translúcido */
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-acc small {
+  margin-left: 2px;
+  color: var(--text-secondary);
+}
+
 /* ─── Step 2 ────────────────────────────────────────────────── */
 .captions-list { display: flex; flex-direction: column; gap: 1rem; max-height: 60vh; overflow-y: auto; }
 

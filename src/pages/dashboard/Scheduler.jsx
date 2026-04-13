@@ -41,6 +41,7 @@ export default function Scheduler() {
   const [selected, setSelected]      = useState([]);
   const [captions, setCaptions]      = useState({});
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [postHistory, setPostHistory] = useState({});
 
   // Step 3 config
   const [postMode, setPostMode]       = useState('now');
@@ -52,15 +53,17 @@ export default function Scheduler() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult]         = useState(null);
 
-  // ── Carrega vídeos do Supabase Storage ──────────────────
+  // ── Carrega vídeos do Supabase Storage e Histórico ──────
   useEffect(() => {
     Promise.all([
       fetch(`${BACKEND_URL}/api/videos`).then(r => r.json()),
-      fetch(`${BACKEND_URL}/api/accounts`).then(r => r.json())
+      fetch(`${BACKEND_URL}/api/accounts`).then(r => r.json()),
+      fetch(`${BACKEND_URL}/api/post-history`).then(r => r.json())
     ])
-      .then(([vData, aData]) => {
+      .then(([vData, aData, hData]) => {
         setVideos(vData.videos || []);
         setAccounts(aData.accounts || []);
+        setPostHistory(hData.history || {});
         if (aData.accounts?.length === 1) setSelectedAccount(aData.accounts[0]);
       })
       .catch(e => setLoadErr(e.message))
@@ -285,6 +288,16 @@ export default function Scheduler() {
                       <div className="vs-info">
                         <p className="vs-name" title={video.name}>{video.name.replace(/^\d+-/, '')}</p>
                         <p className="vs-size">{fmt(video.size)}</p>
+                        
+                        <div className="vs-badges">
+                          {!postHistory[video.name] ? (
+                            <span className="badge-new">✨ Inédito</span>
+                          ) : (
+                            Object.entries(postHistory[video.name]).map(([acc, count]) => (
+                              <span key={acc} className="badge-acc">@{acc} <small>({count}x)</small></span>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
