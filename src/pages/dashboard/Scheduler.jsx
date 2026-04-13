@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Calendar, Shuffle, CheckSquare, Square, ChevronRight,
   ChevronLeft, Clock, Zap, Send, CheckCircle, Loader,
-  Film, AlertCircle, Sparkles
+  Film, AlertCircle, Sparkles, History, ListChecks, Plus
 } from 'lucide-react';
 import './Scheduler.css';
 
@@ -18,7 +18,20 @@ function scheduleTime(baseMs, offsetMin) {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+const LS_KEY = 'iceolab_schedule_history';
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveHistory(entry) {
+  const list = loadHistory();
+  list.unshift(entry);
+  localStorage.setItem(LS_KEY, JSON.stringify(list.slice(0, 200)));
+}
+
 export default function Scheduler() {
+  const [mainTab, setMainTab] = useState('criar'); // criar | agendados | postados
   // ── Wizard state ────────────────────────────────────────
   const [step, setStep]             = useState(1);
   const [videos, setVideos]          = useState([]);
@@ -105,6 +118,16 @@ export default function Scheduler() {
         })
       });
       const data = await res.json();
+      if (data.success) {
+        // Salva no histórico localStorage
+        saveHistory({
+          id: Date.now(),
+          created_at: new Date().toISOString(),
+          account: selectedAccount?.instagram_username,
+          total: data.total,
+          queue: data.queue // [{index, name, scheduled_at, delay_min}]
+        });
+      }
       setResult(data);
     } catch (e) {
       setResult({ error: e.message });
@@ -119,6 +142,7 @@ export default function Scheduler() {
     setIntervalMode('fixed'); setIntervalMin(10); setIntervalMax(15);
     setSelectedAccount(accounts.length === 1 ? accounts[0] : null);
     setResult(null);
+    setMainTab('criar');
   };
 
   // ── Resultado final ──────────────────────────────────────
@@ -172,7 +196,28 @@ export default function Scheduler() {
         </div>
       </header>
 
-      {/* Stepper */}
+      {/* Abas principais */}
+      <div className="main-tabs">
+        <button className={`main-tab ${mainTab === 'criar' ? 'active' : ''}`} onClick={() => setMainTab('criar')}>
+          <Plus size={15} /> Criar
+        </button>
+        <button className={`main-tab ${mainTab === 'agendados' ? 'active' : ''}`} onClick={() => setMainTab('agendados')}>
+          <Clock size={15} /> Agendados
+        </button>
+        <button className={`main-tab ${mainTab === 'postados' ? 'active' : ''}`} onClick={() => setMainTab('postados')}>
+          <ListChecks size={15} /> Postados
+        </button>
+      </div>
+
+      {/* ── Tab: Agendados ─────────────────────────────── */}
+      {mainTab === 'agendados' && <HistoryTab filter="agendados" onNew={() => setMainTab('criar')} />}
+
+      {/* ── Tab: Postados ──────────────────────────────── */}
+      {mainTab === 'postados' && <HistoryTab filter="postados" onNew={() => setMainTab('criar')} />}
+
+      {/* ── Tab: Criar (wizard) ────────────────────────── */}
+      {mainTab === 'criar' && (
+        <>
       <div className="wizard-stepper">
         {['Selecionar Reels', 'Legendas', 'Agendar'].map((label, i) => (
           <div key={i} className={`wizard-step ${step === i + 1 ? 'active' : step > i + 1 ? 'done' : ''}`}>
@@ -438,6 +483,87 @@ export default function Scheduler() {
           </div>
         )}
 
+      </div>
+      </> // fecha aba Criar
+      )}
+    </div>
+  );
+}
+
+// ── Componente de Histórico (Agendados / Postados) ────────────────────────────
+function HistoryTab({ filter, onNew }) {
+  const now = Date.now();
+  const allEntries = loadHistory();
+
+  // Filtra por status do último item da fila (proxy de concluído vs pendente)
+  const entries = allEntries.filter(entry => {
+    if (!entry.queue?.length) return false;
+    const lastItem = entry.queue[entry.queue.length - 1];
+    const lastAt = new Date(lastItem.scheduled_at).getTime();
+    if (filter === 'agendados') return lastAt > now;
+    if (filter === 'postados')  return lastAt <= now;
+    return true;
+  });
+
+  if (entries.length === 0) {
+    return (
+      <div className="view-content">
+        <div className="history-empty glass-panel">
+          {filter === 'agendados'
+            ? <><Clock size={40} /><p>Nenhum agendamento ativo no momento.</p></>
+            : <><ListChecks size={40} /><p>Nenhum Reel postado ainda.</p></>
+          }
+          <button className="sched-btn primary" onClick={onNew}>
+            <Plus size={15} /> Criar agendamento
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="view-content">
+      <div className="history-list">
+        {entries.map(entry => {
+          const lastAt = new Date(entry.queue[entry.queue.length - 1].scheduled_at).getTime();
+          const isPast = lastAt <= now;
+          return (
+            <div key={entry.id} className="history-batch glass-panel">
+              <div className="history-batch-header">
+                <div className={`history-status-dot ${isPast ? 'done' : 'pending'}`} />
+                <div>
+                  <p className="history-account">@{entry.account}</p>
+                  <p className="history-date">
+                    {new Date(entry.created_at).toLocaleString('pt-BR')} · {entry.total} Reels
+                  </p>
+                </div>
+                <span className={`history-badge ${isPast ? 'posted' : 'scheduled'}`}>
+                  {isPast ? '✓ Postado' : '⏱ Agendado'}
+                </span>
+              </div>
+              <div className="history-items">
+                {entry.queue.map((item, i) => {
+                  const itemAt = new Date(item.scheduled_at).getTime();
+                  const itemDone = itemAt <= now;
+                  return (
+                    <div key={i} className={`history-item ${itemDone ? 'done' : 'pending'}`}>
+                      <span className="hi-num">#{item.index}</span>
+                      <span className="hi-name">{item.name.replace(/^\d+-/, '')}</span>
+                      <span className="hi-time">
+                        <Clock size={11} />
+                        {new Date(item.scheduled_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        {item.delay_min === 0 ? ' (imediato)' : ''}
+                      </span>
+                      <span className={`hi-status ${itemDone ? 'done' : 'pending'}`}>
+                        {itemDone ? '✓' : '⏳'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
