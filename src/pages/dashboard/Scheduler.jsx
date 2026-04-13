@@ -61,7 +61,11 @@ export default function Scheduler() {
       fetch(`${BACKEND_URL}/api/post-history`).then(r => r.json())
     ])
       .then(([vData, aData, hData]) => {
-        setVideos(vData.videos || []);
+        const cloudVideos = (vData.videos || []).map(v => {
+          const parts = v.fullPath?.split('/') || [];
+          return { ...v, folder: parts.length > 1 ? parts[0] : '' };
+        });
+        setVideos(cloudVideos);
         setAccounts(aData.accounts || []);
         setPostHistory(hData.history || {});
         if (aData.accounts?.length === 1) setSelectedAccount(aData.accounts[0]);
@@ -272,36 +276,52 @@ export default function Scheduler() {
             )}
 
             {!loading && videos.length > 0 && (
-              <div className="video-select-grid">
-                {videos.map((video) => {
-                  const isSelected = selected.some(v => v.url === video.url);
-                  return (
-                    <div
-                      key={video.url}
-                      className={`video-select-card ${isSelected ? 'selected' : ''}`}
-                      onClick={() => toggleVideo(video)}
-                    >
-                      <div className="vs-check">
-                        {isSelected ? <CheckSquare size={18} color="var(--primary-color)" /> : <Square size={18} />}
-                      </div>
-                      <div className="vs-icon"><Film size={20} /></div>
-                      <div className="vs-info">
-                        <p className="vs-name" title={video.name}>{video.name.replace(/^\d+-/, '')}</p>
-                        <p className="vs-size">{fmt(video.size)}</p>
-                        
-                        <div className="vs-badges">
-                          {!postHistory[video.name] ? (
-                            <span className="badge-new">✨ Inédito</span>
-                          ) : (
-                            Object.entries(postHistory[video.name]).map(([acc, count]) => (
-                              <span key={acc} className="badge-acc">@{acc} <small>({count}x)</small></span>
-                            ))
-                          )}
-                        </div>
-                      </div>
+              <div className="sched-divisions">
+                {Object.entries(videos.reduce((acc, v) => {
+                  const folder = v.folder || 'Principal (Raiz)';
+                  if (!acc[folder]) acc[folder] = [];
+                  acc[folder].push(v);
+                  return acc;
+                }, {})).map(([folder, items]) => (
+                  <div key={folder} className="sched-division-section">
+                    <div className="sched-division-header">
+                      <FolderOpen size={16} />
+                      <h3>Divisão: {folder}</h3>
+                      <span className="sched-division-count">{items.length} vídeos</span>
                     </div>
-                  );
-                })}
+                    <div className="video-select-grid">
+                      {items.map((video) => {
+                        const isSelected = selected.some(v => v.url === video.url);
+                        return (
+                          <div
+                            key={video.url}
+                            className={`video-select-card ${isSelected ? 'selected' : ''}`}
+                            onClick={() => toggleVideo(video)}
+                          >
+                            <div className="vs-check">
+                              {isSelected ? <CheckSquare size={18} color="var(--primary-color)" /> : <Square size={18} />}
+                            </div>
+                            <div className="vs-icon"><Film size={20} /></div>
+                            <div className="vs-info">
+                              <p className="vs-name" title={video.name}>{video.name}</p>
+                              <p className="vs-size">{fmt(video.size)}</p>
+                              
+                              <div className="vs-badges">
+                                {!postHistory[video.name] ? (
+                                  <span className="badge-new">✨ Inédito</span>
+                                ) : (
+                                  Object.entries(postHistory[video.name]).map(([acc, count]) => (
+                                    <span key={acc} className="badge-acc">@{acc} <small>({count}x)</small></span>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 

@@ -18,27 +18,33 @@ export default function ReelsLab() {
   const [waking, setWaking] = useState(false);
   const folderInputRef = useRef();
 
-  // ── Carrega vídeos já no Supabase ao montar (persistência entre abas) ──
+  // ── Carrega vídeos já no Supabase ao montar ──
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/videos`)
       .then(r => r.json())
       .then(({ videos: cloud }) => {
         if (!cloud?.length) return;
-        setVideos(cloud.map(f => ({
-          id: `cloud-${f.name}`,
-          file: null,
-          name: f.name,
-          size: f.size,
-          previewUrl: null,   // sem arquivo local — usar publicUrl no <video>
-          status: 'ready',
-          uploadProgress: 100,
-          publicUrl: f.url,
-          postId: null,
-          caption: '',
-          errorMsg: null,
-        })));
+        setVideos(cloud.map(f => {
+          const parts = f.fullPath.split('/');
+          const folder = parts.length > 1 ? parts[0] : '';
+          return {
+            id: `cloud-${f.fullPath}`,
+            file: null,
+            name: f.name,
+            folder: folder,
+            fullPath: f.fullPath,
+            size: f.size,
+            previewUrl: null,
+            status: 'ready',
+            uploadProgress: 100,
+            publicUrl: f.url,
+            postId: null,
+            caption: '',
+            errorMsg: null,
+          };
+        }));
       })
-      .catch(() => {}); // silencia se backend ainda dormindo
+      .catch(() => {});
   }, []);
 
   // ── Helpers de estado ────────────────────────────────────────────────
@@ -48,6 +54,19 @@ export default function ReelsLab() {
 
   const removeVideo = (id) => setVideos(prev => prev.filter(v => v.id !== id));
 
+  const handleReset = async () => {
+    if (!window.confirm("⚠️ ATENÇÃO: Isso apagará TODOS os vídeos do storage e o histórico de agendamentos. Deseja continuar?")) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/videos/reset`);
+      if (res.ok) {
+        setVideos([]);
+        localStorage.removeItem('iceolab_schedule_history');
+        alert("Laboratório limpo com sucesso.");
+      }
+    } catch (e) {
+      alert("Erro ao resetar: " + e.message);
+    }
+  };
 
   // ── Seleção de pasta ──────────────────────────────────────────────────
   const handleFolderSelect = (e) => {
@@ -60,19 +79,27 @@ export default function ReelsLab() {
       const existingNames = new Set(prev.map(v => v.name));
       const newCards = files
         .filter(f => !existingNames.has(f.name))
-        .map(file => ({
-          id: `${Date.now()}-${Math.random()}`,
-          file,
-          name: file.name,
-          size: file.size,
-          previewUrl: URL.createObjectURL(file),
-          status: 'idle',
-          uploadProgress: 0,
-          publicUrl: null,
-          postId: null,
-          caption: '',
-          errorMsg: null,
-        }));
+        .map(file => {
+          let folder = '';
+          if (file.webkitRelativePath) {
+            const parts = file.webkitRelativePath.split('/');
+            if (parts.length > 1) folder = parts[0];
+          }
+          return {
+            id: `${Date.now()}-${Math.random()}`,
+            file,
+            folder,
+            name: file.name,
+            size: file.size,
+            previewUrl: URL.createObjectURL(file),
+            status: 'idle',
+            uploadProgress: 0,
+            publicUrl: null,
+            postId: null,
+            caption: '',
+            errorMsg: null,
+          };
+        });
       return [...prev, ...newCards];
     });
     e.target.value = '';
@@ -85,13 +112,15 @@ export default function ReelsLab() {
 
     const formData = new FormData();
     formData.append('video', video.file);
+    if (video.folder) {
+      formData.append('folder', video.folder);
+    }
 
     try {
-      // XMLHttpRequest para acompanhar o progresso de upload
       const publicUrl = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${BACKEND_URL}/api/videos/upload`);
-        xhr.timeout = 300000; // 5 min para vídeos grandes
+        xhr.timeout = 300000;
 
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
@@ -111,8 +140,8 @@ export default function ReelsLab() {
             } catch { reject(new Error('Erro desconhecido')); }
           }
         };
-        xhr.ontimeout = () => reject(new Error('Timeout — tente um vídeo menor ou aguarde o servidor acordar.'));
-        xhr.onerror   = () => reject(new Error('Sem conexão. Aguarde ~30s e tente novamente (servidor pode estar acordando).'));
+        xhr.ontimeout = () => reject(new Error('Timeout — tente um vídeo menor.'));
+        xhr.onerror   = () => reject(new Error('Sem conexão.'));
         xhr.send(formData);
       });
 
@@ -122,21 +151,17 @@ export default function ReelsLab() {
     }
   };
 
-  // ── Upload sequencial de todos pendentes (1 por vez = sem crash de RAM) ──
   const handleUploadAll = async () => {
     const pending = videos.filter(v => v.status === 'idle');
     if (!pending.length) return;
-    // Acorda o Render antes de começar
     setWaking(true);
     try { await fetch(`${BACKEND_URL}/api/accounts`); } catch (_) {}
     setWaking(false);
-    // Um por vez para não estourar a memória do servidor
     for (const v of pending) {
       await handleUpload(v);
     }
   };
 
-  // ── Postagem no Instagram ────────────────────────────────────────────
   const handlePost = async (video) => {
     if (!video.publicUrl) return;
     updateVideo(video.id, { status: 'posting', errorMsg: null });
@@ -164,6 +189,14 @@ export default function ReelsLab() {
   const readyCount    = videos.filter(v => v.status === 'ready').length;
   const postedCount   = videos.filter(v => v.status === 'posted').length;
 
+  // ── Agrupamento por divisão (pasta) ──────────────────────────────────
+  const groupedVideos = videos.reduce((acc, v) => {
+    const folder = v.folder || 'Principal (Raiz)';
+    if (!acc[folder]) acc[folder] = [];
+    acc[folder].push(v);
+    return acc;
+  }, {});
+
   return (
     <div className="view-container">
       <header className="page-header">
@@ -172,21 +205,25 @@ export default function ReelsLab() {
             <FlaskConical size={28} style={{ verticalAlign: 'middle', marginRight: 10, color: 'var(--primary-color)' }} />
             Laboratório de Reels
           </h1>
-          <p>Selecione uma pasta do seu Mac e publique vídeos diretamente no Instagram.</p>
+          <p>Selecione pastas do seu Mac e organize seus vídeos por divisões.</p>
         </div>
 
-        {videos.length > 0 && (
-          <div className="lab-stats">
-            <span className="stat-badge idle">{idleCount} aguardando</span>
-            <span className="stat-badge ready">{readyCount} prontos</span>
-            <span className="stat-badge posted">{postedCount} publicados</span>
-          </div>
-        )}
+        <div className="header-actions" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {videos.length > 0 && (
+            <div className="lab-stats">
+              <span className="stat-badge idle">{idleCount} aguardando</span>
+              <span className="stat-badge ready">{readyCount} prontos</span>
+              <span className="stat-badge posted">{postedCount} publicados</span>
+            </div>
+          )}
+          
+          <button className="toolbar-btn secondary danger sm" onClick={handleReset} title="Apagar tudo e começar do zero">
+            <Trash2 size={14} /> Resetar Lab
+          </button>
+        </div>
       </header>
 
       <div className="view-content lab-layout">
-
-        {/* ── Zona de Seleção ──────────────────────────────────────── */}
         {videos.length === 0 ? (
           <div
             className="lab-drop-zone glass-panel"
@@ -196,7 +233,7 @@ export default function ReelsLab() {
               <FolderOpen size={56} />
             </div>
             <h2>Selecionar Pasta de Vídeos</h2>
-            <p>Clique aqui para escolher uma pasta do seu Mac.<br />Todos os arquivos de vídeo serão detectados automaticamente.</p>
+            <p>Clique aqui para escolher uma pasta do seu Mac.<br />A pasta será usada como a "Divisão" deste conjunto de vídeos.</p>
             <button className="select-folder-btn">
               <FolderOpen size={18} />
               Escolher Pasta
@@ -215,15 +252,13 @@ export default function ReelsLab() {
           </div>
         ) : (
           <div className="lab-workspace">
-
-            {/* Toolbar */}
             <div className="lab-toolbar glass-panel">
               <button
                 className="toolbar-btn secondary"
                 onClick={() => folderInputRef.current?.click()}
               >
                 <FolderOpen size={16} />
-                Adicionar Pasta
+                Adicionar Outra Pasta
               </button>
               {(idleCount > 0 || waking) && (
                 <button className="toolbar-btn primary" onClick={handleUploadAll} disabled={waking}>
@@ -246,17 +281,27 @@ export default function ReelsLab() {
               />
             </div>
 
-            {/* Grid de vídeos */}
-            <div className="videos-grid">
-              {videos.map(video => (
-                <VideoCard
-                  key={video.id}
-                  video={video}
-                  onUpload={() => handleUpload(video)}
-                  onPost={() => handlePost(video)}
-                  onRemove={() => removeVideo(video.id)}
-                  onCaptionChange={(val) => updateVideo(video.id, { caption: val })}
-                />
+            <div className="lab-divisions">
+              {Object.entries(groupedVideos).map(([folder, items]) => (
+                <div key={folder} className="division-section">
+                  <div className="division-header">
+                    <FolderOpen size={16} />
+                    <h3>Divisão: {folder}</h3>
+                    <span className="division-count">{items.length} vídeos</span>
+                  </div>
+                  <div className="videos-grid">
+                    {items.map(video => (
+                      <VideoCard
+                        key={video.id}
+                        video={video}
+                        onUpload={() => handleUpload(video)}
+                        onPost={() => handlePost(video)}
+                        onRemove={() => removeVideo(video.id)}
+                        onCaptionChange={(val) => updateVideo(video.id, { caption: val })}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -266,11 +311,9 @@ export default function ReelsLab() {
   );
 }
 
-// ── Componente individual de cada vídeo ──────────────────────────────────
 function VideoCard({ video, onUpload, onPost, onRemove, onCaptionChange }) {
   const { name, size, previewUrl, publicUrl, status, uploadProgress, caption, postId, errorMsg } = video;
-  const videoSrc = previewUrl || publicUrl; // local blob ou URL do Supabase
-
+  const videoSrc = previewUrl || publicUrl;
 
   const statusConfig = {
     idle:      { label: 'Aguardando upload', color: '#94a3b8' },
@@ -285,8 +328,6 @@ function VideoCard({ video, onUpload, onPost, onRemove, onCaptionChange }) {
 
   return (
     <div className={`video-card glass-panel ${status}`}>
-
-      {/* Preview */}
       <div className="video-preview-wrap">
         <video
           src={videoSrc}
@@ -308,19 +349,16 @@ function VideoCard({ video, onUpload, onPost, onRemove, onCaptionChange }) {
         </button>
       </div>
 
-      {/* Info */}
       <div className="video-card-body">
         <p className="video-name" title={name}>{name}</p>
         <p className="video-size">{formatSize(size)}</p>
 
-        {/* Barra de upload */}
         {status === 'uploading' && (
           <div className="upload-progress-bar">
             <div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} />
           </div>
         )}
 
-        {/* Legenda */}
         {(status === 'ready' || status === 'error') && (
           <textarea
             className="reel-textarea caption-mini"
@@ -331,19 +369,16 @@ function VideoCard({ video, onUpload, onPost, onRemove, onCaptionChange }) {
           />
         )}
 
-        {/* Erro */}
         {status === 'error' && errorMsg && (
           <p className="card-error">
             <AlertCircle size={12} /> {errorMsg}
           </p>
         )}
 
-        {/* Post ID */}
         {status === 'posted' && postId && (
           <p className="card-post-id">Post ID: <code>{postId}</code></p>
         )}
 
-        {/* Botões de ação */}
         <div className="video-card-actions">
           {status === 'idle' && (
             <button className="card-btn upload" onClick={onUpload}>
