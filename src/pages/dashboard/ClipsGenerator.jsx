@@ -48,28 +48,8 @@ export default function ReelsLab() {
 
   const removeVideo = (id) => setVideos(prev => prev.filter(v => v.id !== id));
 
-  // ── Seleção de pasta ─────────────────────────────────────────────────
-  const handleFolderSelect = (e) => {
-    const files = Array.from(e.target.files).filter(f =>
-      f.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(f.name)
-    );
-    if (!files.length) return;
 
-    const newVideos = files.map(file => ({
-      id: `${Date.now()}-${Math.random()}`,
-      file,
-      name: file.name,
-      size: file.size,
-      previewUrl: URL.createObjectURL(file),
-      status: 'idle',   // idle | uploading | ready | posting | posted | error
-      uploadProgress: 0,
-      publicUrl: null,
-      postId: null,
-      caption: '',
-      errorMsg: null,
-    }));
-
-  // ── Seleção de pasta ────────────────────────────────────────
+  // ── Seleção de pasta ──────────────────────────────────────────────────
   const handleFolderSelect = (e) => {
     const files = Array.from(e.target.files).filter(f =>
       f.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(f.name)
@@ -79,7 +59,7 @@ export default function ReelsLab() {
     setVideos(prev => {
       const existingNames = new Set(prev.map(v => v.name));
       const newCards = files
-        .filter(f => !existingNames.has(f.name)) // não duplica já existentes
+        .filter(f => !existingNames.has(f.name))
         .map(file => ({
           id: `${Date.now()}-${Math.random()}`,
           file,
