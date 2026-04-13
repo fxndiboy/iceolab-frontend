@@ -123,7 +123,6 @@ export default function ReelsLab() {
   };
 
   // ── Upload sequencial de todos pendentes (1 por vez = sem crash de RAM) ──
-  const [waking, setWaking] = useState(false);
   const handleUploadAll = async () => {
     const pending = videos.filter(v => v.status === 'idle');
     if (!pending.length) return;
