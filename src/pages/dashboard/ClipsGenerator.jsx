@@ -64,6 +64,7 @@ export default function ReelsLab() {
         setVideos([]);
         localStorage.removeItem('iceolab_schedule_history');
         alert("Laboratório limpo com sucesso!");
+        window.location.reload(); // Força recarga total para limpar o Agendador e outros estados
       } else {
         alert("Falha ao resetar: " + (data.error || data.message || "Erro desconhecido"));
       }
