@@ -58,13 +58,17 @@ export default function ReelsLab() {
     if (!window.confirm("⚠️ ATENÇÃO: Isso apagará TODOS os vídeos do storage e o histórico de agendamentos. Deseja continuar?")) return;
     try {
       const res = await fetch(`${BACKEND_URL}/api/videos/reset`);
-      if (res.ok) {
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
         setVideos([]);
         localStorage.removeItem('iceolab_schedule_history');
-        alert("Laboratório limpo com sucesso.");
+        alert("Laboratório limpo com sucesso!");
+      } else {
+        alert("Falha ao resetar: " + (data.error || data.message || "Erro desconhecido"));
       }
     } catch (e) {
-      alert("Erro ao resetar: " + e.message);
+      alert("Erro de conexão ao resetar: " + e.message);
     }
   };
 
