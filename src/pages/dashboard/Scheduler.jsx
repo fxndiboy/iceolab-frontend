@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   Calendar, Shuffle, CheckSquare, Square, ChevronRight,
   ChevronLeft, Clock, Zap, Send, CheckCircle, Loader,
-  Film, AlertCircle, Sparkles, History, ListChecks, Plus
+  Film, AlertCircle, Sparkles, ListChecks, Plus
 } from 'lucide-react';
 import './Scheduler.css';
 
