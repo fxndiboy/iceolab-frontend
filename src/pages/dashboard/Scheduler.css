@@ -593,16 +593,25 @@
 .sched-division-header {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 0.25rem;
+}
+
+.sd-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .sched-division-header h3 {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--primary-color);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .sched-division-count {

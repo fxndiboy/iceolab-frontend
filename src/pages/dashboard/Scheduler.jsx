@@ -83,9 +83,13 @@ export default function Scheduler() {
     );
   };
 
-  const selectRandom = (n = 10) => {
-    const shuffled = [...videos].sort(() => Math.random() - 0.5);
-    setSelected(shuffled.slice(0, Math.min(n, videos.length)));
+  const selectRandom = (n = 10, folderName = null) => {
+    let pool = videos;
+    if (folderName) {
+      pool = videos.filter(v => v.folder === folderName);
+    }
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    setSelected(shuffled.slice(0, Math.min(n, pool.length)));
   };
 
   // ── Preview da fila ──────────────────────────────────────
@@ -244,12 +248,9 @@ export default function Scheduler() {
               <h2>Selecionar Reels</h2>
               <div className="step1-actions">
                 <span className="selected-badge">{selected.length} selecionados</span>
-                <button className="sched-btn secondary sm" onClick={() => selectRandom(10)}>
-                  <Shuffle size={14} /> 10 Aleatórios
-                </button>
                 {selected.length > 0 && (
                   <button className="sched-btn secondary sm" onClick={() => setSelected([])}>
-                    Limpar
+                    Limpar Seleção
                   </button>
                 )}
               </div>
@@ -285,9 +286,14 @@ export default function Scheduler() {
                 }, {})).map(([folder, items]) => (
                   <div key={folder} className="sched-division-section">
                     <div className="sched-division-header">
-                      <FolderOpen size={16} />
-                      <h3>Divisão: {folder}</h3>
-                      <span className="sched-division-count">{items.length} vídeos</span>
+                      <div className="sd-title">
+                        <FolderOpen size={16} />
+                        <h3>Divisão: {folder}</h3>
+                        <span className="sched-division-count">{items.length} vídeos</span>
+                      </div>
+                      <button className="sched-btn secondary sm" onClick={() => selectRandom(10, folder === 'Principal (Raiz)' ? '' : folder)}>
+                        <Shuffle size={13} /> 10 Aleatórios
+                      </button>
                     </div>
                     <div className="video-select-grid">
                       {items.map((video) => {
