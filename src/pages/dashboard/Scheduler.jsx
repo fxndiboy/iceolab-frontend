@@ -36,8 +36,9 @@ export default function Scheduler() {
   const [step, setStep]             = useState(1);
   const [videos, setVideos]          = useState([]);
   const [accounts, setAccounts]      = useState([]);
-  const [loading, setLoading]        = useState(true);
-  const [loadErr, setLoadErr]        = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [sortMode, setSortMode] = useState('rank'); // 'rank' ou 'views'
   const [selected, setSelected]      = useState([]);
   const [captions, setCaptions]      = useState({});
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -66,8 +67,14 @@ export default function Scheduler() {
           return { ...v, folder: parts.length > 1 ? parts[0] : '' };
         });
 
-        // Ordenação automática por Rank (crescente)
+        // Ordenação Dinâmica
         cloudVideos.sort((a, b) => {
+          if (sortMode === 'views') {
+            const vA = parseViewsValue(a.views);
+            const vB = parseViewsValue(b.views);
+            return vB - vA; // Maiores views primeiro
+          }
+          // Default: Rank (Crescente)
           if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
           if (a.rank !== null) return -1;
           if (b.rank !== null) return 1;
@@ -101,6 +108,21 @@ export default function Scheduler() {
     setSelected(shuffled.slice(0, Math.min(n, pool.length)));
   };
 
+  // Re-ordena quando o modo de ordenação muda
+  useEffect(() => {
+    if (videos.length === 0) return;
+    const sorted = [...videos].sort((a, b) => {
+      if (sortMode === 'views') {
+        return parseViewsValue(b.views) - parseViewsValue(a.views);
+      }
+      if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
+      if (a.rank !== null) return -1;
+      if (b.rank !== null) return 1;
+      return 0;
+    });
+    setVideos(sorted);
+  }, [sortMode]);
+
   // ── Preview da fila ──────────────────────────────────────
   const buildQueuePreview = () => {
     const baseMs = postMode === 'now' ? Date.now() : new Date(scheduledAt).getTime() || Date.now();
@@ -115,6 +137,15 @@ export default function Scheduler() {
   };
 
   // ── Submissão ────────────────────────────────────────────
+  // Converte views string ('2.5M', '900K') para número para ordenação
+  const parseViewsValue = (viewsStr) => {
+    if (!viewsStr) return 0;
+    const val = parseFloat(viewsStr.replace(/[^\d.]/g, ''));
+    if (viewsStr.includes('M')) return val * 1000000;
+    if (viewsStr.includes('K')) return val * 1000;
+    return val;
+  };
+
   const handleSubmit = async () => {
     setSubmitting(true);
     const items = selected.map(v => ({
@@ -257,11 +288,26 @@ export default function Scheduler() {
               <h2>Selecionar Reels</h2>
               <div className="step1-actions">
                 <span className="selected-badge">{selected.length} selecionados</span>
-                {selected.length > 0 && (
                   <button className="sched-btn secondary sm" onClick={() => setSelected([])}>
                     Limpar Seleção
                   </button>
                 )}
+                <div className="sort-toggle-group">
+                  <button 
+                    className={`sort-btn ${sortMode === 'rank' ? 'active' : ''}`} 
+                    onClick={() => setSortMode('rank')}
+                    title="Ordenar por Posição (Top01, Top02...)"
+                  >
+                    Top Rank
+                  </button>
+                  <button 
+                    className={`sort-btn ${sortMode === 'views' ? 'active' : ''}`} 
+                    onClick={() => setSortMode('views')}
+                    title="Ordenar por Visualizações (Maiores primeiro)"
+                  >
+                    🔥 Melhores Views
+                  </button>
+                </div>
               </div>
             </div>
 
