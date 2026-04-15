@@ -54,27 +54,38 @@ export default function Scheduler() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult]         = useState(null);
 
-  // ── Carrega vídeos do Supabase Storage e Histórico ──────
-  useEffect(() => {
-    Promise.all([
-      fetch(`${BACKEND_URL}/api/videos`).then(r => r.json()),
-      fetch(`${BACKEND_URL}/api/accounts`).then(r => r.json()),
-      fetch(`${BACKEND_URL}/api/post-history`).then(r => r.json())
-    ])
-      .then(([vData, aData, hData]) => {
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [vRes, aRes, hRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/videos`),
+        fetch(`${BACKEND_URL}/api/accounts`),
+        fetch(`${BACKEND_URL}/api/post-history`)
+      ]);
+      const [vData, aData, hData] = await Promise.all([vRes.json(), aRes.json(), hRes.json()]);
+
+      if (vData.videos) {
+        // Regex relaxada para lidar com prefixos (ex: 123-Top01...)
+        const regex = /Top(?<rank>\d{2})_(?<views>[\d\.MK]+)_v_(?<id>.+)\.mp4$/;
+        
         const cloudVideos = (vData.videos || []).map(v => {
           const parts = v.fullPath?.split('/') || [];
-          return { ...v, folder: parts.length > 1 ? parts[0] : '' };
+          const match = v.name.match(regex);
+          const meta = match?.groups || {};
+          return { 
+            ...v, 
+            folder: parts.length > 1 ? parts[0] : '',
+            rank: meta.rank ? parseInt(meta.rank) : null,
+            views: meta.views || null,
+            videoId: meta.id || null
+          };
         });
 
         // Ordenação Dinâmica
         cloudVideos.sort((a, b) => {
           if (sortMode === 'views') {
-            const vA = parseViewsValue(a.views);
-            const vB = parseViewsValue(b.views);
-            return vB - vA; // Maiores views primeiro
+            return parseViewsValue(b.views) - parseViewsValue(a.views);
           }
-          // Default: Rank (Crescente)
           if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
           if (a.rank !== null) return -1;
           if (b.rank !== null) return 1;
@@ -85,9 +96,16 @@ export default function Scheduler() {
         setAccounts(aData.accounts || []);
         setPostHistory(hData.history || {});
         if (aData.accounts?.length === 1) setSelectedAccount(aData.accounts[0]);
-      })
-      .catch(e => setLoadErr(e.message))
-      .finally(() => setLoading(false));
+      }
+    } catch (e) {
+      setLoadErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
   // ── Seleção ──────────────────────────────────────────────
@@ -291,7 +309,6 @@ export default function Scheduler() {
                   <button className="sched-btn secondary sm" onClick={() => setSelected([])}>
                     Limpar Seleção
                   </button>
-                )}
                 <div className="sort-toggle-group">
                   <button 
                     className={`sort-btn ${sortMode === 'rank' ? 'active' : ''}`} 
