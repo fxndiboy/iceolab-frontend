@@ -21,6 +21,24 @@ export default function Settings() {
     }
   };
 
+  const handleDisconnect = async (id, username) => {
+    if (!window.confirm(`Deseja realmente desconectar a conta @${username}?`)) return;
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/accounts/${id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAccounts(prev => prev.filter(acc => acc.id !== id));
+      } else {
+        alert("Erro ao desconectar: " + data.error);
+      }
+    } catch (err) {
+      alert("Erro de conexão ao desconectar.");
+    }
+  };
+
   useEffect(() => {
     fetchAccounts();
   }, []);
@@ -77,7 +95,12 @@ export default function Settings() {
                     <h4>Instagram Profissional</h4>
                     <p>@{account.instagram_username}</p>
                   </div>
-                  <button className="disconnect-btn">Desconectar</button>
+                  <button 
+                    className="disconnect-btn" 
+                    onClick={() => handleDisconnect(account.id, account.instagram_username)}
+                  >
+                    Desconectar
+                  </button>
                 </div>
               ))
             )}
