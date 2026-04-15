@@ -65,6 +65,15 @@ export default function Scheduler() {
           const parts = v.fullPath?.split('/') || [];
           return { ...v, folder: parts.length > 1 ? parts[0] : '' };
         });
+
+        // Ordenação automática por Rank (crescente)
+        cloudVideos.sort((a, b) => {
+          if (a.rank !== null && b.rank !== null) return a.rank - b.rank;
+          if (a.rank !== null) return -1;
+          if (b.rank !== null) return 1;
+          return 0;
+        });
+
         setVideos(cloudVideos);
         setAccounts(aData.accounts || []);
         setPostHistory(hData.history || {});
@@ -319,6 +328,9 @@ export default function Scheduler() {
                                   Object.entries(postHistory[video.name]).map(([acc, count]) => (
                                     <span key={acc} className="badge-acc">@{acc} <small>({count}x)</small></span>
                                   ))
+                                )}
+                                {video.views && (
+                                  <span className="badge-views">🔥 {video.views} views</span>
                                 )}
                               </div>
                             </div>

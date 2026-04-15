@@ -356,7 +356,12 @@ function VideoCard({ video, onUpload, onPost, onRemove, onCaptionChange }) {
 
       <div className="video-card-body">
         <p className="video-name" title={name}>{name}</p>
-        <p className="video-size">{formatSize(size)}</p>
+        <div className="video-meta-row">
+          <p className="video-size">{formatSize(size)}</p>
+          {video.views && (
+            <span className="badge-views mini">🔥 {video.views}</span>
+          )}
+        </div>
 
         {status === 'uploading' && (
           <div className="upload-progress-bar">
